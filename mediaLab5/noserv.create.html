@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=yes, initial-scale=1, maximum-scale=1">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta id="theme-color" name="theme-color" content="#ffffff">
+    <base target="_blank">
+    <link href="//fonts.googleapis.com/css?family=Roboto:300,400,500,700" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" href="css/main.css">
+    <style>
+        video {
+            object-fit: cover;
+        }
+    </style>
+  <link href="noserv.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+</head>
+<body>
+<h3> Create offers SDP </h3>
+<textarea id="creater-sdp"></textarea>
+<h3> Get Participants SDP <button id="start">start</button></h3>
+<textarea id="joiner-sdp" placeholder="copy participants SDP here"></textarea>
+<h3> chat area </h3>
+<div id="chat">
+  <div id="chat-screen-wp">
+    <div id="chat-screen"></div>
+  </div>
+  <div id="ct"><input id="msg" disabled><button id="send" disabled>send</button></div>
+</div>
+
+<div id="container">
+    <video playsinline autoplay></video>
+    <canvas></canvas>
+</div>
+
+<script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+<script src="js/main.js" async></script>
+
+<script>
+//var server       = { urls: "stun:stun.l.google.com:19302" };
+var sdpConstraints = { optional: [{RtpDataChannels: true}]  };
+var pc = new RTCPeerConnection(null);
+var dc;
+
+	const canvas = window.canvas = document.querySelector('canvas');
+	canvas.style.display="none";
+	canvas.width = 100;
+	canvas.height = 100;
+	var pngUrl;
+
+pc.oniceconnectionstatechange = function(e) {
+  var state = pc.iceConnectionState;
+  $('#status').html(state);
+  if (state == "connected") $("#msg, #send").attr("disabled", false);
+};
+pc.onicecandidate = function(e) {
+  if (e.candidate) return;
+  $("#creater-sdp").val(JSON.stringify(pc.localDescription));
+}
+
+function createOfferSDP() {
+  dc = pc.createDataChannel("chat");
+  pc.createOffer().then(function(e) {
+    pc.setLocalDescription(e)
+  });
+  dc.onopen = function(){$("textarea").attr("disabled",true);addMSG("CONNECTED!", "info")};
+  dc.onmessage = function(e) {
+    if (e.data) addMSG(e.data, "other");
+  }
+};
+
+function start() {
+  var answerSDP = $('#joiner-sdp').val()
+  var answerDesc = new RTCSessionDescription(JSON.parse(answerSDP));
+  pc.setRemoteDescription(answerDesc);
+}
+var addMSG = function(msg, who) {
+  var wrap = $("<div>").addClass("wrap").appendTo($("#chat-screen"));
+  var div  = $("<div>").addClass(who).appendTo(wrap);
+  $("<span>").html(who).addClass("who").appendTo(div);
+  $("<span>").html(msg).addClass("msg").appendTo(div);
+  $("#chat-screen-wp").scrollTop($("#chat-screen").height());
+}
+
+createOfferSDP();
+
+function sendMSG() {
+
+	canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+	pngUrl = canvas.toDataURL();
+
+  var value = pngUrl;//$("#msg").val();
+  if (value) {
+    dc.send(value);
+    addMSG(value, "me");
+    $("#msg").val('');
+	  var t = setTimeout(sendMSG, 200);
+  }
+
+}
+$("#start").click(function(){start();});
+$("#msg").keypress(function(e) {if(e.which == 13) {sendMSG()}});
+$("#send").click(sendMSG);
+</script>
+</body>
+</html>
